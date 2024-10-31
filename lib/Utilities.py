@@ -2,6 +2,13 @@ import configparser
 import os
 
 
+def get_index_containing_text(file_lines: list[str], text_to_find: str) -> int:
+    return next(
+        (i for i, l in enumerate(file_lines)
+         if l.upper().find(text_to_find.upper()) > 1), -1
+    )
+
+
 def get_ini_file_path(ini_file_name):
     current_dir = os.path.dirname(__file__)
     return current_dir + "\\" + ini_file_name + ".ini"
