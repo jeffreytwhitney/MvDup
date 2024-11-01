@@ -1,77 +1,115 @@
-import shutil
 import os
+import shutil
 import time
+from typing import List
 
 from lib.Utilities import (get_stored_ini_value, get_unencoded_file_lines,
                            write_lines_to_file, get_index_containing_text)
 
 
-def replace_text_with_prompt(file_lines: list[str], input_filepath: str):
+class export_processor:
+    _input_filename:str
+    _input_filepath: str
+    _input_directory: str
+    _file_lines: List[str] = []
+    _primary_output_directory: str
+    _secondary_output_directory: str
+    _convert_to_prompts: bool
+    _duplicate_file: bool
+    _change_to_filename: str
+    _primary_output_filepath: str
+    _secondary_output_filepath: str
 
-    for line in file_lines:
-        line.replace("Text EMPLOYEE: Text", "Prompt EMPLOYEE: Input")
-        line.replace("Text JOB: Text", "Prompt JOB: Input")
-        line.replace("Text MACHINE: Text", "Prompt MACHINE: Input")
-        line.replace("Text SEQUENCE: Text", "Prompt SEQUENCE: Input")
-    write_lines_to_file(input_filepath, file_lines)
+    def __init__(self, input_filename: str):
+        self._input_filename = input_filename
+        self._input_directory = get_stored_ini_value("Paths", "input_path", "settings")
+        self._input_filepath = os.path.join(self._input_directory, input_filename)
+        self._file_lines = get_unencoded_file_lines(self._input_filepath)
+        self._primary_output_directory = str(get_stored_ini_value("Paths", "primary_output_path", "settings"))
+        self._secondary_output_directory = get_stored_ini_value("Paths", "secondary_output_path", "settings")
+        self._convert_to_prompts = bool(get_stored_ini_value("ProcessSwitches", "convert_text_to_prompt", "settings"))
+        self._duplicate_file = bool(get_stored_ini_value("ProcessSwitches", "duplicate_file", "settings"))
+        self._change_to_filename = get_stored_ini_value("ProcessSwitches", "change_to_filename", "settings")
+        self._primary_output_filepath = str(os.path.join(self._primary_output_directory, input_filename))
+        self._secondary_output_filepath = str(os.path.join(self._secondary_output_directory, self._change_to_filename))
 
+    def _replace_text_with_prompt(self, search_text, current_text, replacement_text) -> bool:
+        idx = get_index_containing_text(self._file_lines, search_text)
+        if idx != -1:
+            line = self._file_lines[idx]
+            self._file_lines[idx] = line.replace(current_text, replacement_text)
+            return True
+        else:
+            return False
 
-def convert_export_to_spc_style(file_lines: list[str], input_filepath: str):
+    def _format_export_file(self):
 
-    idx = get_index_containing_text(file_lines, "Text REV LETTER:")
-    file_lines.pop(idx)
+        if any([self._replace_text_with_prompt("Text EMPLOYEE", "Text EMPLOYEE: Text", "Prompt EMPLOYEE: Input"),
+                self._replace_text_with_prompt("Text JOB", "Text JOB: Text", "Prompt JOB: Input"),
+                self._replace_text_with_prompt("Text MACHINE", "Text MACHINE: Text", "Prompt MACHINE: Input"),
+                self._replace_text_with_prompt("Text SEQUENCE", "Text SEQUENCE: Text", "Prompt SEQUENCE: Input")]):
+            write_lines_to_file(self._input_filepath, self._file_lines)
 
-    idx = get_index_containing_text(file_lines, "Text OPERATION:")
-    file_lines.pop(idx)
+    def _extract_rev_letter(self) -> str:
+        idx = get_index_containing_text(self._file_lines, "Text REV LETTER:")
+        line = self._file_lines[idx]
+        return line.split(",")[1].strip("\n").strip("\"")
 
-    idx = get_index_containing_text(file_lines, "Prompt SEQUENCE:")
-    file_lines.pop(idx)
+    def _generate_spc_part_number_line(self, current_line: str) -> str:
+        first_part = current_line.split(",")[1].strip("\n").strip("\"")
+        second_part = self._extract_rev_letter()
+        return f"\"{first_part} REV {second_part}\"\n"
 
-    idx = get_index_containing_text(file_lines, "Text PT")
-    line = file_lines[idx]
-    file_lines[idx] = line.split(",")[1]
+    def _convert_export_to_spc_style(self):
+        idx = get_index_containing_text(self._file_lines, "Text PT")
+        line = self._file_lines[idx]
+        self._file_lines[idx] = self._generate_spc_part_number_line(line)
 
-    idx = get_index_containing_text(file_lines, "Prompt EMPLOYEE")
-    line = file_lines[idx]
-    file_lines[idx] = line.split(",")[1]
+        idx = get_index_containing_text(self._file_lines, "Prompt EMPLOYEE")
+        line = self._file_lines[idx]
+        self._file_lines[idx] = line.split(",")[1]
 
-    idx = get_index_containing_text(file_lines, "Prompt JOB")
-    line = file_lines[idx]
-    file_lines[idx] = line.split(",")[1]
+        idx = get_index_containing_text(self._file_lines, "Prompt JOB")
+        line = self._file_lines[idx]
+        self._file_lines[idx] = line.split(",")[1]
 
-    idx = get_index_containing_text(file_lines, "Prompt MACHINE")
-    line = file_lines[idx]
-    file_lines[idx] = line.split(",")[1]
+        idx = get_index_containing_text(self._file_lines, "Prompt MACHINE")
+        line = self._file_lines[idx]
+        self._file_lines[idx] = line.split(",")[1]
 
-    idx = get_index_containing_text(file_lines, "Text IN PROCESS")
-    line = file_lines[idx]
-    file_lines[idx] = line.split(",")[1]
+        idx = get_index_containing_text(self._file_lines, "Text IN PROCESS")
+        line = self._file_lines[idx]
+        self._file_lines[idx] = line.split(",")[1].replace("IN PROCESS", "RUN")
 
-    write_lines_to_file(input_filepath, file_lines)
+        idx = get_index_containing_text(self._file_lines, "Text REV LETTER:")
+        self._file_lines.pop(idx)
+
+        idx = get_index_containing_text(self._file_lines, "Text OPERATION:")
+        self._file_lines.pop(idx)
+
+        idx = get_index_containing_text(self._file_lines, "Prompt SEQUENCE:")
+        self._file_lines.pop(idx)
+
+        write_lines_to_file(self._input_filepath, self._file_lines)
+
+    def process_export(self):
+        if self._convert_to_prompts:
+            self._format_export_file()
+        if self._duplicate_file:
+            shutil.copyfile(self._input_filepath, self._primary_output_filepath)
+            self._convert_export_to_spc_style()
+            shutil.move(self._input_filepath, self._secondary_output_filepath)
+        else:
+            shutil.move(self._input_filepath, self._primary_output_filepath)
 
 
 def main():
-    input_directory = get_stored_ini_value("Paths", "input_path", "settings")
-    primary_output_directory = get_stored_ini_value("Paths", "primary_output_path", "settings")
-    secondary_output_directory = get_stored_ini_value("Paths", "output_path_two", "settings")
-    convert_to_prompts = bool(get_stored_ini_value("ProcessSwitches", "convert_text_to_prompt", "settings"))
-    duplicate_file = bool(get_stored_ini_value("ProcessSwitches", "duplicate_file", "settings"))
     while True:
+        input_directory = get_stored_ini_value("Paths", "input_path", "settings")
         for filename in os.listdir(input_directory):
-            change_to_filename = get_stored_ini_value("ProcessSwitches", "change_to_filename", "settings")
-            input_filepath = os.path.join(input_directory, filename)
-            file_lines = get_unencoded_file_lines(input_filepath)
-            primary_output_filepath = os.path.join(primary_output_directory, filename)
-            secondary_output_filepath = os.path.join(secondary_output_directory, change_to_filename)
-            if convert_to_prompts:
-                replace_text_with_prompt(file_lines, input_filepath)
-            if duplicate_file:
-                shutil.copyfile(input_filepath, primary_output_filepath)
-                convert_export_to_spc_style(file_lines, input_filepath)
-                shutil.move(input_filepath, str(secondary_output_filepath))
-            else:
-                shutil.move(input_filepath, str(primary_output_filepath))
-        time.sleep(6)
+            export = export_processor(filename)
+            export.process_export()
+            time.sleep(6)
 
 
 if __name__ == "__main__":
