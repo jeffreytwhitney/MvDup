@@ -8,7 +8,7 @@ from lib.Utilities import (get_stored_ini_value, get_unencoded_file_lines,
 
 
 class export_processor:
-    _input_filename:str
+    _input_filename: str
     _input_filepath: str
     _input_directory: str
     _file_lines: List[str] = []
