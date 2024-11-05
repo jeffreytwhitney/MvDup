@@ -1,10 +1,69 @@
+import configparser
 import os
 import shutil
+import sys
 import time
 from typing import List
 
-from lib.Utilities import (get_stored_ini_value, get_unencoded_file_lines,
-                           write_lines_to_file, get_index_containing_text)
+
+def write_error(e: Exception):
+    error_path = os.path.join(resolve_path(), "error_log.txt")
+    with open(error_path, "a") as f:
+        f.write(f"{e}\n")
+
+
+def write_error_message(error_message: str):
+
+    error_path = os.path.join(resolve_path(), "error_log.txt")
+    with open(error_path, "a") as f:
+        f.write(f"{error_message}\n")
+
+
+def get_index_containing_text(file_lines: list[str], text_to_find: str) -> int:
+    return next(
+        (i for i, l in enumerate(file_lines)
+         if l.upper().find(text_to_find.upper()) != -1), -1
+    )
+
+
+def resolve_path():
+    return (
+        os.path.abspath(os.path.dirname(sys.executable))
+        if getattr(sys, "frozen", False)
+        else os.path.abspath(os.path.join(os.getcwd()))
+    )
+
+
+def get_ini_file_path(ini_file_name):
+    current_dir = resolve_path()
+    return current_dir + "\\" + ini_file_name + ".ini"
+
+
+def get_stored_ini_value(ini_section, ini_key, ini_filename):
+    ini_file_path = get_ini_file_path(ini_filename)
+    config = configparser.ConfigParser()
+    config.read(ini_file_path)
+    try:
+        config_value = config.get(ini_section, ini_key)
+    except:
+        try:
+            config_value = config.get(ini_section, "*")
+        except:
+            config_value = ""
+    return config_value
+
+
+def get_unencoded_file_lines(file_path: str) -> list[str]:
+    if not file_path:
+        return []
+    with open(file_path, "r") as f:
+        return f.readlines()
+
+
+def write_lines_to_file(output_filepath: str, file_lines: list[str], newline='\n'):
+    with open(output_filepath, 'w+', newline=f'{newline}') as f:
+        for line in file_lines:
+            f.write(f"{line}")
 
 
 class export_processor:
@@ -104,12 +163,23 @@ class export_processor:
 
 
 def main():
-    while True:
+    try:
         input_directory = get_stored_ini_value("Paths", "input_path", "settings")
-        for filename in os.listdir(input_directory):
-            export = export_processor(filename)
-            export.process_export()
-            time.sleep(6)
+    except Exception as e:
+        write_error(e)
+
+    if input_directory:
+        while True:
+            for filename in os.listdir(input_directory):
+                print(filename)
+                time.sleep(6)
+                export = export_processor(filename)
+                try:
+                    export.process_export()
+                except Exception as e:
+                    write_error(e)
+    else:
+        write_error_message("Can't find .ini file.")
 
 
 if __name__ == "__main__":
