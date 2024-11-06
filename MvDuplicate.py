@@ -163,6 +163,7 @@ class export_processor:
 
 
 def main():
+    input_directory = ""
     try:
         input_directory = get_stored_ini_value("Paths", "input_path", "settings")
     except Exception as e:
