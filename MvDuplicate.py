@@ -202,6 +202,9 @@ class export_processor:
         idx = get_index_containing_text(self._file_lines, "Prompt SEQUENCE:")
         self._file_lines.pop(idx)
 
+        for i, l in enumerate(self._file_lines):
+            self._file_lines[i] = l.replace(",", "\t").replace("\n", "\t\n").replace("\t\t", "\t")
+
         write_lines_to_file(self._input_filepath, self._file_lines)
 
     def process_export(self):
@@ -223,10 +226,10 @@ def main():
         input_directory = get_stored_ini_value("Paths", "input_path", "settings")
         while True:
             for filename in os.listdir(input_directory):
-                print(filename)
                 time.sleep(6)
                 export = export_processor(filename)
                 export.process_export()
+                print(filename)
 
 
 if __name__ == "__main__":
