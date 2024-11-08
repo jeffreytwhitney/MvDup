@@ -172,38 +172,41 @@ class export_processor:
         second_part = self._extract_rev_letter()
         return f"\"{first_part} REV {second_part}\"\n"
 
+    def _remove_line_with_text(self, text_to_find: str) -> None:
+        for i, line in enumerate(self._file_lines):
+            if line.find(text_to_find) != -1:
+                self._file_lines.pop(i)
+                return
+
     def _convert_export_to_spc_style(self):
-        idx = get_index_containing_text(self._file_lines, "Text PT")
-        line = self._file_lines[idx]
-        self._file_lines[idx] = self._generate_spc_part_number_line(line)
 
-        idx = get_index_containing_text(self._file_lines, "Prompt EMPLOYEE")
-        line = self._file_lines[idx]
-        self._file_lines[idx] = line.split(",")[1]
+        for i, line in enumerate(self._file_lines):
+            if line.find("Text PT") != -1:
+                self._file_lines[i] = self._generate_spc_part_number_line(line)
+                continue
 
-        idx = get_index_containing_text(self._file_lines, "Prompt JOB")
-        line = self._file_lines[idx]
-        self._file_lines[idx] = line.split(",")[1]
+            if line.find("Prompt EMPLOYEE") != -1:
+                self._file_lines[i] = line.split(",")[1]
+                continue
 
-        idx = get_index_containing_text(self._file_lines, "Prompt MACHINE")
-        line = self._file_lines[idx]
-        self._file_lines[idx] = line.split(",")[1]
+            if line.find("Prompt JOB") != -1:
+                self._file_lines[i] = line.split(",")[1]
+                continue
 
-        idx = get_index_containing_text(self._file_lines, "Text IN PROCESS")
-        line = self._file_lines[idx]
-        self._file_lines[idx] = line.split(",")[1].replace("IN PROCESS", "RUN")
+            if line.find("Prompt MACHINE") != -1:
+                self._file_lines[i] = line.split(",")[1]
+                continue
 
-        idx = get_index_containing_text(self._file_lines, "Text REV LETTER:")
-        self._file_lines.pop(idx)
+            if line.find("Text IN PROCESS") != -1:
+                self._file_lines[i] = line.split(",")[1].replace("IN PROCESS", "RUN")
+                continue
 
-        idx = get_index_containing_text(self._file_lines, "Text OPERATION:")
-        self._file_lines.pop(idx)
+        self._remove_line_with_text("Text REV LETTER")
+        self._remove_line_with_text("Text OPERATION")
+        self._remove_line_with_text("Prompt SEQUENCE")
 
-        idx = get_index_containing_text(self._file_lines, "Prompt SEQUENCE:")
-        self._file_lines.pop(idx)
-
-        for i, l in enumerate(self._file_lines):
-            self._file_lines[i] = l.replace(",", "\t").replace("\n", "\t\n").replace("\t\t", "\t")
+        for i, line in enumerate(self._file_lines):
+            self._file_lines[i] = line.replace(",", "\t")
 
         write_lines_to_file(self._input_filepath, self._file_lines)
 
